@@ -1,0 +1,383 @@
+import json
+import os
+import glob
+import time
+import re # 숫자 추출을 위해 re 모듈 추가
+
+import numpy as np
+import pandas as pd
+from scipy.linalg import svd
+
+from rom import BoundaryData, ModeDerivatives, PDEContext, SteadyNavierStokesPDE
+
+# --- 설정값 ---
+NUM_CASES = 8     # 스냅샷(케이스) 개수
+NX, NY = 101, 101  # 격자 크기
+N_NODES = NX * NY
+K = 8    # 사용할 모드의 개수 (최대 NUM_CASES)
+DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'offlineDATA')
+
+# --- 유틸리티 함수 ---
+
+def load_and_preprocess_data(filepath):
+    """CSV 파일을 로드하고 전처리합니다."""
+    df = pd.read_csv(filepath)
+    df.columns = df.columns.str.strip()
+    
+
+    df['x-coordinate'] = df['x-coordinate'].round(decimals=5)
+    df['y-coordinate'] = df['y-coordinate'].round(decimals=5)
+    # ------------------------------------
+
+    # 데이터의 물리적 순서를 보장하기 위해 좌표를 기준으로 정렬합니다.
+    df = df.sort_values(by=['y-coordinate', 'x-coordinate'], ascending=[True, True])
+
+    required_cols = ['x-coordinate', 'y-coordinate', 'pressure', 'x-velocity', 'y-velocity']
+    
+    missing_cols = set(required_cols) - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"파일 '{os.path.basename(filepath)}'에 다음 열이 없습니다: {list(missing_cols)}")
+    RHO, U0, L0 = 998.2, 0.1, 0.01
+    df['x-coordinate'] /= L0
+    df['y-coordinate'] /= L0
+    df['x-velocity']   /= U0
+    df['y-velocity']   /= U0
+    df['pressure']     /= (RHO*U0**2)
+
+    return df[required_cols]
+
+class DerivativeHelper:
+    """미분코드"""
+    def __init__(self, nx, ny):
+        self.nx, self.ny = nx, ny
+        x = np.linspace(0,1, nx)
+        y = np.linspace(-1.0, 0, ny)
+        self.delta_x = x[1] - x[0]
+        self.delta_y = y[1] - y[0]
+
+    def _to_2d(self, field_1d):
+        return field_1d.reshape((self.ny, self.nx))
+
+    def _to_1d(self, field_2d):
+        return field_2d.flatten()
+
+    def dx(self, field_1d):
+        """x 방향 편미분"""
+        field_2d = self._to_2d(field_1d)
+        return self._to_1d(np.gradient(field_2d, self.delta_x, axis=1))
+
+    def dy(self, field_1d):
+        """y 방향 편미분"""
+        field_2d = self._to_2d(field_1d)
+        return self._to_1d(np.gradient(field_2d, self.delta_y, axis=0))
+
+    def laplacian(self, field_1d):
+        """라플라시안 연산"""
+        field_2d = self._to_2d(field_1d)
+        grad_x = np.gradient(field_2d, self.delta_x, axis=1)
+        grad_y = np.gradient(field_2d, self.delta_y, axis=0)
+        lap_x = np.gradient(grad_x, self.delta_x, axis=1)
+        lap_y = np.gradient(grad_y, self.delta_y, axis=0)
+        return self._to_1d(lap_x + lap_y)
+
+def expand_modes(modes_interior, nx, ny):
+    """내부 모드를 전체 도메인으로 확장합니다 (0-padding)."""
+    nx_int, ny_int = nx - 2, ny - 2
+    num_modes = modes_interior.shape[1]
+    modes_full = np.zeros((nx * ny, num_modes))
+
+    for k in range(num_modes):
+        mode_k_int = modes_interior[:, k].reshape((ny_int, nx_int))
+        mode_k_full = np.zeros((ny, nx))
+        mode_k_full[1:-1, 1:-1] = mode_k_int
+        modes_full[:, k] = mode_k_full.flatten()
+    return modes_full
+
+
+import matplotlib.pyplot as plt
+
+
+def visualize_full_snapshot(Q_col, nx, ny, case_index, data_directory):
+    """특정 전체 스냅샷의 압력 및 속도 필드를 시각화하고 파일로 저장합니다."""
+    n_nodes = nx * ny
+
+    # 1차원 벡터에서 p, u, v 분리
+    p_full = Q_col[0*n_nodes : 1*n_nodes]
+    u_full = Q_col[1*n_nodes : 2*n_nodes]
+    v_full = Q_col[2*n_nodes : 3*n_nodes]
+
+    # 플로팅을 위해 2D로 변환
+    p_2d = p_full.reshape((ny, nx))
+    u_2d = u_full.reshape((ny, nx))
+    v_2d = v_full.reshape((ny, nx))
+
+    # 시각화
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle(f'Full Snapshot Visualization (from case {case_index + 1})', fontsize=16)
+
+    im_p = axes[0].imshow(p_2d, cmap='viridis', origin='lower')
+    axes[0].set_title('Full Pressure')
+    fig.colorbar(im_p, ax=axes[0])
+
+    im_u = axes[1].imshow(u_2d, cmap='viridis', origin='lower')
+    axes[1].set_title('Full X-Velocity')
+    fig.colorbar(im_u, ax=axes[1])
+
+    im_v = axes[2].imshow(v_2d, cmap='viridis', origin='lower')
+    axes[2].set_title('Full Y-Velocity')
+    fig.colorbar(im_v, ax=axes[2])
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    
+    # 결과를 이미지 파일로 저장
+    output_filename = os.path.join(data_directory, f'debug_full_snapshot_case_{case_index + 1}.png')
+    plt.savefig(output_filename)
+    print(f"   -> 디버깅 이미지 저장 완료: '{output_filename}'")
+    plt.close(fig)
+
+
+def visualize_interior_snapshot(Q_int_col, nx, ny, case_index, data_directory):
+    """특정 내부 스냅샷의 압력 및 속도 필드를 시각화하고 파일로 저장합니다."""
+    nx_int, ny_int = nx - 2, ny - 2
+    n_nodes_int = nx_int * ny_int
+
+    # 1차원 벡터에서 p, u, v 분리
+    p_int = Q_int_col[0*n_nodes_int : 1*n_nodes_int]
+    u_int = Q_int_col[1*n_nodes_int : 2*n_nodes_int]
+    v_int = Q_int_col[2*n_nodes_int : 3*n_nodes_int]
+
+    # 플로팅을 위해 2D로 변환
+    p_2d = p_int.reshape((ny_int, nx_int))
+    u_2d = u_int.reshape((ny_int, nx_int))
+    v_2d = v_int.reshape((ny_int, nx_int))
+
+    # 시각화
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle(f'Interior Snapshot Visualization (from case {case_index + 1})', fontsize=16)
+
+    im_p = axes[0].imshow(p_2d, cmap='viridis', origin='lower')
+    axes[0].set_title('Interior Pressure')
+    fig.colorbar(im_p, ax=axes[0])
+
+    im_u = axes[1].imshow(u_2d, cmap='viridis', origin='lower')
+    axes[1].set_title('Interior X-Velocity')
+    fig.colorbar(im_u, ax=axes[1])
+
+    im_v = axes[2].imshow(v_2d, cmap='viridis', origin='lower')
+    axes[2].set_title('Interior Y-Velocity')
+    fig.colorbar(im_v, ax=axes[2])
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    
+    # 결과를 이미지 파일로 저장
+    output_filename = os.path.join(data_directory, f'debug_interior_snapshot_case_{case_index + 1}.png')
+    plt.savefig(output_filename)
+    print(f"   -> 디버깅 이미지 저장 완료: '{output_filename}'")
+    plt.close(fig) # 창이 뜨는 것을 방지
+
+# --- OFFLINE 계산 시작 ---
+
+def run_offline_stage(data_directory=None):
+    """OFFLINE 단계 전체를 실행합니다."""
+    print("--- OFFLINE STAGE START ---")
+    start_time = time.time()
+
+    # 1. 모든 스냅샷 행렬 Q 구성
+    data_directory = data_directory or DEFAULT_DATA_DIRECTORY
+    print(f"1. Loading snapshots from '{data_directory}' and building Q matrix...")
+
+    if not os.path.isdir(data_directory):
+        raise FileNotFoundError(f"지정된 디렉토리를 찾을 수 없습니다: '{data_directory}'")
+
+    file_pattern = os.path.join(data_directory, 'case*_sorted.csv')
+    filepaths = glob.glob(file_pattern)
+
+    if len(filepaths) == 0:
+        raise FileNotFoundError(f"디렉토리 '{data_directory}'에서 'case*_sorted.csv' 패턴의 파일을 찾을 수 없습니다.")
+
+    # --- 수정된 부분: 숫자 크기 순으로 파일 정렬 ---
+    def get_case_number(path):
+        """파일 이름에서 'case' 뒤의 숫자를 추출하여 정수로 반환합니다."""
+        # 정규표현식을 사용하여 숫자 부분을 찾습니다.
+        match = re.search(r'case(\d+)_sorted\.csv', os.path.basename(path))
+        # 숫자를 찾으면 정수로 변환하여 반환하고, 없으면 정렬 순서에 영향을 주지 않도록 -1을 반환합니다.
+        return int(match.group(1)) if match else -1
+    
+    filepaths.sort(key=get_case_number)
+    # ---------------------------------------------
+    
+    if len(filepaths) != NUM_CASES:
+        print(f"경고: {NUM_CASES}개의 파일을 예상했지만 {len(filepaths)}개를 찾았습니다. 찾은 파일로 계속 진행합니다.")
+        actual_num_cases = len(filepaths)
+    else:
+        actual_num_cases = NUM_CASES
+
+    Q = np.zeros((N_NODES * 3, actual_num_cases))
+
+    for i, fpath in enumerate(filepaths):
+        print(f"  - Loading {os.path.basename(fpath)}...")
+        df = load_and_preprocess_data(fpath)
+        q_n = np.concatenate([df['pressure'].values, df['x-velocity'].values, df['y-velocity'].values])
+        Q[:, i] = q_n
+    
+    coords = df[['x-coordinate', 'y-coordinate']].values
+
+    # --- ✨1단계 디버깅: 전체 스냅샷 확인✨ ---
+    print("1a. [Debug] Visualizing the first FULL snapshot...")
+    case_to_visualize = 0 
+    visualize_full_snapshot(Q[:, case_to_visualize], NX, NY, case_to_visualize, data_directory)
+    # -----------------------------------------
+
+
+
+    # 2. Q_interior 구성
+    print("2. Building Q_interior matrix...")
+    nx_int, ny_int = NX - 2, NY - 2
+    Q_interior = np.zeros((nx_int * ny_int * 3, actual_num_cases))
+    for i in range(actual_num_cases):
+        p, u, v = Q[0:N_NODES, i], Q[N_NODES:2*N_NODES, i], Q[2*N_NODES:3*N_NODES, i]
+        p_int = p.reshape(NY, NX)[1:-1, 1:-1].flatten()
+        u_int = u.reshape(NY, NX)[1:-1, 1:-1].flatten()
+        v_int = v.reshape(NY, NX)[1:-1, 1:-1].flatten()
+        Q_interior[:, i] = np.concatenate([p_int, u_int, v_int])
+        
+    # --- ✨여기에 코드를 추가하세요✨ ---
+    print("2a. [Debug] Visualizing the first interior snapshot...")
+    # 첫 번째 스냅샷(case 1)의 내부 유동장을 이미지로 저장
+    case_to_visualize = 0 
+    visualize_interior_snapshot(Q_interior[:, case_to_visualize], NX, NY, case_to_visualize, data_directory)
+    # ---------------------------------
+
+
+    # 3. POD 수행
+    print(f"3. Performing POD for k={K} modes...")
+    U, s, Vh = svd(Q_interior, full_matrices=False)
+    Phi_interior = U[:, :K]
+
+
+
+    print("\n3a. [Verification] Analyzing energy distribution within each mode...")
+
+    nx_int, ny_int = NX - 2, NY - 2
+    n_nodes_int = nx_int * ny_int
+
+    # 각 모드를 p, u, v 부분으로 분리
+    p_modes_int = Phi_interior[0*n_nodes_int : 1*n_nodes_int, :]
+    u_modes_int = Phi_interior[1*n_nodes_int : 2*n_nodes_int, :]
+    v_modes_int = Phi_interior[2*n_nodes_int : 3*n_nodes_int, :]
+
+    print("-" * 50)
+    print(" Mode # | Pressure Energy | Velocity Energy | Total")
+    print("-" * 50)
+
+    for k in range(K):
+        # 각 성분의 에너지 (L2 norm 제곱) 계산
+        p_energy = np.linalg.norm(p_modes_int[:, k])**2
+        u_energy = np.linalg.norm(u_modes_int[:, k])**2
+        v_energy = np.linalg.norm(v_modes_int[:, k])**2
+        
+        total_energy = p_energy + u_energy + v_energy
+        
+        # 속도 에너지 = u 에너지 + v 에너지
+        velocity_energy = u_energy + v_energy
+        
+        # 각 성분의 에너지 기여도 (%) 계산
+        p_percentage = (p_energy / total_energy) * 100
+        velocity_percentage = (velocity_energy / total_energy) * 100
+        
+        print(f" {k+1:^6} | {p_percentage:^15.2f}% | {velocity_percentage:^15.2f}% | 100.00%")
+
+    print("-" * 50)
+
+    # 4. 모드 분리 및 확장
+    print("4. Separating and expanding modes...")
+    p_modes_int = Phi_interior[0*(nx_int*ny_int) : 1*(nx_int*ny_int), :]
+    u_modes_int = Phi_interior[1*(nx_int*ny_int) : 2*(nx_int*ny_int), :]
+    v_modes_int = Phi_interior[2*(nx_int*ny_int) : 3*(nx_int*ny_int), :]
+    p_modes, u_modes, v_modes = (expand_modes(m, NX, NY) for m in [p_modes_int, u_modes_int, v_modes_int])
+
+    # 5. 경계 조건(u_bc) 생성
+    print("5. Creating boundary condition vector u_bc...")
+    u_bc = np.zeros(N_NODES)
+    y_coords = coords[:, 1].reshape((NY, NX))
+    u_bc[(y_coords == y_coords.max()).flatten()] = 1
+
+    # 6. Galerkin 투영을 위한 텐서 계산 (실무용 완전한 버전)
+    print("6. Pre-calculating Galerkin tensors (Full System)...")
+    deriv = DerivativeHelper(NX, NY)
+
+    d_dx = {
+        'p': [deriv.dx(p_modes[:, i]) for i in range(K)],
+        'u': [deriv.dx(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.dx(v_modes[:, i]) for i in range(K)],
+    }
+    d_dy = {
+        'p': [deriv.dy(p_modes[:, i]) for i in range(K)],
+        'u': [deriv.dy(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.dy(v_modes[:, i]) for i in range(K)],
+    }
+    lap = {
+        'u': [deriv.laplacian(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.laplacian(v_modes[:, i]) for i in range(K)],
+    }
+
+    mode_derivatives = ModeDerivatives(
+        phi_p=p_modes,
+        phi_u=u_modes,
+        phi_v=v_modes,
+        dx_phi_p=np.column_stack(d_dx['p']),
+        dy_phi_p=np.column_stack(d_dy['p']),
+        dx_phi_u=np.column_stack(d_dx['u']),
+        dy_phi_u=np.column_stack(d_dy['u']),
+        dx_phi_v=np.column_stack(d_dx['v']),
+        dy_phi_v=np.column_stack(d_dy['v']),
+        lap_phi_u=np.column_stack(lap['u']),
+        lap_phi_v=np.column_stack(lap['v']),
+    )
+
+    boundary_data = BoundaryData(
+        u_bc=u_bc,
+        dx_u_bc=deriv.dx(u_bc),
+        dy_u_bc=deriv.dy(u_bc),
+        lap_u_bc=deriv.laplacian(u_bc),
+    )
+
+    context = PDEContext(
+        modes=mode_derivatives,
+        boundary=boundary_data,
+        inner_product=lambda lhs, rhs: float(np.dot(lhs, rhs)),
+    )
+
+    pde = SteadyNavierStokesPDE()
+
+    print(f"   Calculating tensors for PDE: {pde.name}. This may take a while...")
+    C1, C2 = pde.compute_constant_terms(context)
+    L1, L2 = pde.compute_linear_terms(context)
+    Q = pde.compute_quadratic_terms(context)
+
+    # 7. 오프라인 데이터 저장
+    print("7. Saving offline data to 'rom_offline_data.npz'...")
+    np.savez('rom_offline_data.npz',
+             p_modes=p_modes, u_modes=u_modes, v_modes=v_modes,
+             u_bc=u_bc, coords=coords,
+             C1=C1, C2=C2, L1=L1, L2=L2, Q=Q, K=K, NX=NX, NY=NY
+            )
+
+    metadata = {
+        "pde_name": pde.name,
+        "num_modes": int(K),
+        "nx": int(NX),
+        "ny": int(NY),
+    }
+    with open('rom_offline_metadata.json', 'w', encoding='utf-8') as fh:
+        json.dump(metadata, fh, ensure_ascii=False, indent=2)
+    
+    end_time = time.time()
+    print(f"--- OFFLINE STAGE COMPLETE (Total time: {end_time - start_time:.2f} seconds) ---")
+
+
+
+
+if __name__ == '__main__':
+    default_data_dir = os.environ.get('OFFLINE_DATA_DIRECTORY', DEFAULT_DATA_DIRECTORY)
+    run_offline_stage(default_data_dir)

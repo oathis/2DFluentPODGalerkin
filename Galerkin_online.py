@@ -14,10 +14,7 @@ L0  = 0.01    # m
 OFFLINE_WAS_NONDIM = True
 
 
-# --- ✨ 1. 저장 경로를 지정하는 변수 추가 ---
-# 저장할 디렉터리 경로를 정의합니다.
-# raw string (r"...")을 사용하여 Windows 경로의 백슬래시 문제를 방지합니다.
-OUTPUT_DIRECTORY = r'C:\Users\spearlab05\Desktop\Galerkin ROM\FinalResult'
+DEFAULT_OUTPUT_DIRECTORY = os.path.join(os.path.dirname(__file__), 'FinalResult')
 
 def load_offline_data(filepath='rom_offline_data.npz'):
     """저장된 오프라인 데이터를 로드합니다."""
@@ -148,12 +145,13 @@ def plot_solution_interpolated(coords, p, u, v, Re, output_dir):
     plt.close()
     print("Plotting complete.")
 
-def run_online_stage(re_input):
+def run_online_stage(re_input, output_dir=None):
     """ONLINE 단계 전체를 실행합니다."""
     try:
+        output_dir = output_dir or DEFAULT_OUTPUT_DIRECTORY
         # --- ✨ 4. 저장할 디렉터리가 없으면 자동으로 생성 ---
-        os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-        print(f"Output files will be saved to: '{OUTPUT_DIRECTORY}'")
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Output files will be saved to: '{output_dir}'")
 
         offline_data = load_offline_data()
         K = int(offline_data['K'])
@@ -188,8 +186,8 @@ def run_online_stage(re_input):
         coords_phys, p_out, u_out, v_out = to_physical_units(offline_data['coords'], p, u, v)
 
         # --- ✨ 5. 함수 호출 시 저장 경로를 전달 ---
-        save_solution_to_csv(coords_phys, p_out, u_out, v_out, Re, OUTPUT_DIRECTORY)
-        plot_solution_interpolated(coords_phys, p_out, u_out, v_out, Re, OUTPUT_DIRECTORY)
+        save_solution_to_csv(coords_phys, p_out, u_out, v_out, Re, output_dir)
+        plot_solution_interpolated(coords_phys, p_out, u_out, v_out, Re, output_dir)
         
         print(f"\n--- ONLINE STAGE COMPLETE for Re = {Re} ---")
 
@@ -201,6 +199,7 @@ def run_online_stage(re_input):
         print(f"An unexpected error occurred: {e}")
 
 if __name__ == '__main__':
+    default_output_dir = os.environ.get('ONLINE_OUTPUT_DIRECTORY', DEFAULT_OUTPUT_DIRECTORY)
     # 100부터 1000까지 25씩 증가하는 Reynolds 수 리스트 생성
     # np.arange(start, stop, step)은 stop 값을 포함하지 않으므로 1001로 설정
     re_list = np.arange(100, 1001, 25)
@@ -209,6 +208,6 @@ if __name__ == '__main__':
     print(re_list) # 생성된 리스트 확인 (선택 사항)
 
     for i in re_list:
-        run_online_stage(i)
+        run_online_stage(i, output_dir=default_output_dir)
 
     print("\nAll simulations finished.")

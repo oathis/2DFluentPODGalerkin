@@ -11,7 +11,7 @@ NUM_CASES = 8     # 스냅샷(케이스) 개수
 NX, NY = 101, 101  # 격자 크기
 N_NODES = NX * NY
 K = 8    # 사용할 모드의 개수 (최대 NUM_CASES)
-DATA_DIRECTORY = r'C:\Users\spearlab05\Desktop\Galerkin ROM\offlineDATA' # 데이터 파일 경로 지정
+DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'offlineDATA')
 
 # --- 유틸리티 함수 ---
 
@@ -173,22 +173,23 @@ def visualize_interior_snapshot(Q_int_col, nx, ny, case_index, data_directory):
 
 # --- OFFLINE 계산 시작 ---
 
-def run_offline_stage():
+def run_offline_stage(data_directory=None):
     """OFFLINE 단계 전체를 실행합니다."""
     print("--- OFFLINE STAGE START ---")
     start_time = time.time()
 
     # 1. 모든 스냅샷 행렬 Q 구성
-    print(f"1. Loading snapshots from '{DATA_DIRECTORY}' and building Q matrix...")
-    
-    if not os.path.isdir(DATA_DIRECTORY):
-        raise FileNotFoundError(f"지정된 디렉토리를 찾을 수 없습니다: '{DATA_DIRECTORY}'")
+    data_directory = data_directory or DEFAULT_DATA_DIRECTORY
+    print(f"1. Loading snapshots from '{data_directory}' and building Q matrix...")
 
-    file_pattern = os.path.join(DATA_DIRECTORY, 'case*_sorted.csv')
+    if not os.path.isdir(data_directory):
+        raise FileNotFoundError(f"지정된 디렉토리를 찾을 수 없습니다: '{data_directory}'")
+
+    file_pattern = os.path.join(data_directory, 'case*_sorted.csv')
     filepaths = glob.glob(file_pattern)
-    
+
     if len(filepaths) == 0:
-        raise FileNotFoundError(f"디렉토리 '{DATA_DIRECTORY}'에서 'case*_sorted.csv' 패턴의 파일을 찾을 수 없습니다.")
+        raise FileNotFoundError(f"디렉토리 '{data_directory}'에서 'case*_sorted.csv' 패턴의 파일을 찾을 수 없습니다.")
 
     # --- 수정된 부분: 숫자 크기 순으로 파일 정렬 ---
     def get_case_number(path):
@@ -220,7 +221,7 @@ def run_offline_stage():
     # --- ✨1단계 디버깅: 전체 스냅샷 확인✨ ---
     print("1a. [Debug] Visualizing the first FULL snapshot...")
     case_to_visualize = 0 
-    visualize_full_snapshot(Q[:, case_to_visualize], NX, NY, case_to_visualize, DATA_DIRECTORY)
+    visualize_full_snapshot(Q[:, case_to_visualize], NX, NY, case_to_visualize, data_directory)
     # -----------------------------------------
 
 
@@ -240,7 +241,7 @@ def run_offline_stage():
     print("2a. [Debug] Visualizing the first interior snapshot...")
     # 첫 번째 스냅샷(case 1)의 내부 유동장을 이미지로 저장
     case_to_visualize = 0 
-    visualize_interior_snapshot(Q_interior[:, case_to_visualize], NX, NY, case_to_visualize, DATA_DIRECTORY)
+    visualize_interior_snapshot(Q_interior[:, case_to_visualize], NX, NY, case_to_visualize, data_directory)
     # ---------------------------------
 
 
@@ -363,5 +364,6 @@ def run_offline_stage():
 
 
 if __name__ == '__main__':
-    run_offline_stage()
+    default_data_dir = os.environ.get('OFFLINE_DATA_DIRECTORY', DEFAULT_DATA_DIRECTORY)
+    run_offline_stage(default_data_dir)
 

@@ -1,6 +1,0 @@
-{
-  "pde_name": "steady-incompressible-navier-stokes",
-  "num_modes": 8,
-  "nx": 101,
-  "ny": 101
-}

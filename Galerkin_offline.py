@@ -1,10 +1,14 @@
-import numpy as np
-import pandas as pd
-from scipy.linalg import svd
+import json
 import os
 import glob
 import time
 import re # 숫자 추출을 위해 re 모듈 추가
+
+import numpy as np
+import pandas as pd
+from scipy.linalg import svd
+
+from rom import BoundaryData, ModeDerivatives, PDEContext, SteadyNavierStokesPDE
 
 # --- 설정값 ---
 NUM_CASES = 8     # 스냅샷(케이스) 개수
@@ -301,53 +305,55 @@ def run_offline_stage(data_directory=None):
     # 6. Galerkin 투영을 위한 텐서 계산 (실무용 완전한 버전)
     print("6. Pre-calculating Galerkin tensors (Full System)...")
     deriv = DerivativeHelper(NX, NY)
-    
-    d_dx = {'p': [], 'u': [], 'v': []}
-    d_dy = {'p': [], 'u': [], 'v': []}
-    lap = {'u': [], 'v': []}
-    for i in range(K):
-        d_dx['p'].append(deriv.dx(p_modes[:, i]))
-        d_dy['p'].append(deriv.dy(p_modes[:, i]))
-        d_dx['u'].append(deriv.dx(u_modes[:, i]))
-        d_dy['u'].append(deriv.dy(u_modes[:, i]))
-        d_dx['v'].append(deriv.dx(v_modes[:, i]))
-        d_dy['v'].append(deriv.dy(v_modes[:, i]))
-        lap['u'].append(deriv.laplacian(u_modes[:, i]))
-        lap['v'].append(deriv.laplacian(v_modes[:, i]))
-        
-    u_bc_dx = deriv.dx(u_bc)
-    u_bc_dy = deriv.dy(u_bc)
-    u_bc_lap = deriv.laplacian(u_bc)
 
-    C1 = np.zeros(K)
-    C2 = np.zeros(K)
-    L1 = np.zeros((K, K))
-    L2 = np.zeros((K, K))
-    Q = np.zeros((K, K, K))
+    d_dx = {
+        'p': [deriv.dx(p_modes[:, i]) for i in range(K)],
+        'u': [deriv.dx(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.dx(v_modes[:, i]) for i in range(K)],
+    }
+    d_dy = {
+        'p': [deriv.dy(p_modes[:, i]) for i in range(K)],
+        'u': [deriv.dy(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.dy(v_modes[:, i]) for i in range(K)],
+    }
+    lap = {
+        'u': [deriv.laplacian(u_modes[:, i]) for i in range(K)],
+        'v': [deriv.laplacian(v_modes[:, i]) for i in range(K)],
+    }
 
-    print("   Calculating tensors C, L, Q. This may take a while...")
-    for m in range(K):
-        C1[m] = np.dot(u_bc_dx, p_modes[:, m]) + np.dot(u_bc * u_bc_dx, u_modes[:, m])
-        C2[m] = np.dot(-u_bc_lap, u_modes[:, m])
-        
-        for j in range(K):
-            L1_rc = np.dot(d_dx['u'][j] + d_dy['v'][j], p_modes[:, m])
-            L1_ru = np.dot(u_bc * d_dx['u'][j] + u_modes[:, j] * u_bc_dx + v_modes[:, j] * u_bc_dy + d_dx['p'][j], u_modes[:, m])
-            L1_rv = np.dot(u_bc * d_dx['v'][j] + d_dy['p'][j], v_modes[:, m])
-            L1[m, j] = L1_rc + L1_ru + L1_rv
-            
-            L2_ru = np.dot(-lap['u'][j], u_modes[:, m])
-            L2_rv = np.dot(-lap['v'][j], v_modes[:, m])
-            L2[m, j] = L2_ru + L2_rv
+    mode_derivatives = ModeDerivatives(
+        phi_p=p_modes,
+        phi_u=u_modes,
+        phi_v=v_modes,
+        dx_phi_p=np.column_stack(d_dx['p']),
+        dy_phi_p=np.column_stack(d_dy['p']),
+        dx_phi_u=np.column_stack(d_dx['u']),
+        dy_phi_u=np.column_stack(d_dy['u']),
+        dx_phi_v=np.column_stack(d_dx['v']),
+        dy_phi_v=np.column_stack(d_dy['v']),
+        lap_phi_u=np.column_stack(lap['u']),
+        lap_phi_v=np.column_stack(lap['v']),
+    )
 
-            for i in range(K):
-                ru_quad_term = u_modes[:, i] * d_dx['u'][j] + v_modes[:, i] * d_dy['u'][j]
-                Q_ru = np.dot(ru_quad_term, u_modes[:, m])
-                
-                rv_quad_term = u_modes[:, i] * d_dx['v'][j] + v_modes[:, i] * d_dy['v'][j]
-                Q_rv = np.dot(rv_quad_term, v_modes[:, m])
-                
-                Q[m, i, j] = Q_ru + Q_rv
+    boundary_data = BoundaryData(
+        u_bc=u_bc,
+        dx_u_bc=deriv.dx(u_bc),
+        dy_u_bc=deriv.dy(u_bc),
+        lap_u_bc=deriv.laplacian(u_bc),
+    )
+
+    context = PDEContext(
+        modes=mode_derivatives,
+        boundary=boundary_data,
+        inner_product=lambda lhs, rhs: float(np.dot(lhs, rhs)),
+    )
+
+    pde = SteadyNavierStokesPDE()
+
+    print(f"   Calculating tensors for PDE: {pde.name}. This may take a while...")
+    C1, C2 = pde.compute_constant_terms(context)
+    L1, L2 = pde.compute_linear_terms(context)
+    Q = pde.compute_quadratic_terms(context)
 
     # 7. 오프라인 데이터 저장
     print("7. Saving offline data to 'rom_offline_data.npz'...")
@@ -356,6 +362,15 @@ def run_offline_stage(data_directory=None):
              u_bc=u_bc, coords=coords,
              C1=C1, C2=C2, L1=L1, L2=L2, Q=Q, K=K, NX=NX, NY=NY
             )
+
+    metadata = {
+        "pde_name": pde.name,
+        "num_modes": int(K),
+        "nx": int(NX),
+        "ny": int(NY),
+    }
+    with open('rom_offline_metadata.json', 'w', encoding='utf-8') as fh:
+        json.dump(metadata, fh, ensure_ascii=False, indent=2)
     
     end_time = time.time()
     print(f"--- OFFLINE STAGE COMPLETE (Total time: {end_time - start_time:.2f} seconds) ---")

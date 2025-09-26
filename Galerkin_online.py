@@ -1,8 +1,10 @@
+import json
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve
 from scipy.interpolate import griddata
-import os
 import matplotlib.pyplot as plt
 
 
@@ -15,15 +17,25 @@ OFFLINE_WAS_NONDIM = True
 
 
 DEFAULT_OUTPUT_DIRECTORY = os.path.join(os.path.dirname(__file__), 'FinalResult')
+METADATA_FILE = os.path.join(os.path.dirname(__file__), 'rom_offline_metadata.json')
 
 def load_offline_data(filepath='rom_offline_data.npz'):
     """저장된 오프라인 데이터를 로드합니다."""
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"오프라인 데이터 파일 '{filepath}'을 찾을 수 없습니다. 먼저 offline.py를 실행하세요.")
-    
+
     print(f"Loading offline data from '{filepath}'...")
     data = np.load(filepath)
     return {key: data[key] for key in data}
+
+
+def load_offline_metadata(filepath: str = METADATA_FILE) -> dict:
+    """Load metadata about the ROM if it exists."""
+    if not os.path.exists(filepath):
+        return {}
+
+    with open(filepath, 'r', encoding='utf-8') as fh:
+        return json.load(fh)
 
 def rom_residual(alpha, Re, C1, C2, L1, L2, Q):
     """
@@ -154,6 +166,16 @@ def run_online_stage(re_input, output_dir=None):
         print(f"Output files will be saved to: '{output_dir}'")
 
         offline_data = load_offline_data()
+        metadata = load_offline_metadata()
+        if metadata:
+            print(
+                "Offline tensors built for PDE: {pde_name} (modes={modes}, grid={nx}x{ny}).".format(
+                    pde_name=metadata.get('pde_name', 'unknown'),
+                    modes=metadata.get('num_modes', 'N/A'),
+                    nx=metadata.get('nx', 'N/A'),
+                    ny=metadata.get('ny', 'N/A'),
+                )
+            )
         K = int(offline_data['K'])
 
 

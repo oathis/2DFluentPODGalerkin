@@ -202,7 +202,7 @@ if __name__ == '__main__':
     default_output_dir = os.environ.get('ONLINE_OUTPUT_DIRECTORY', DEFAULT_OUTPUT_DIRECTORY)
     # 100부터 1000까지 25씩 증가하는 Reynolds 수 리스트 생성
     # np.arange(start, stop, step)은 stop 값을 포함하지 않으므로 1001로 설정
-    re_list = np.arange(100, 1001, 25)
+    re_list = np.arange(100, 1001, 50)
 
     print(f"Starting online stage for {len(re_list)} Reynolds numbers...")
     print(re_list) # 생성된 리스트 확인 (선택 사항)

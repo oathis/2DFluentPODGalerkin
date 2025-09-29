@@ -104,7 +104,7 @@ if not os.path.exists(output_directory):
     print(f"Created output directory: {output_directory}")
 
 # 4. Re 범위를 100부터 1000까지 50씩 증가시키며 반복합니다.
-for re_number in range(100, 1001, 50):
+for re_number in range(100, 1001, 10):
     file_name = f'rom_solution_Re_{re_number}.csv'
     full_file_path = os.path.join(base_directory, file_name)
 

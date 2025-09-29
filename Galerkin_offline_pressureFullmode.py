@@ -7,11 +7,11 @@ import time
 import re # 숫자 추출을 위해 re 모듈 추가
 
 # --- 설정값 ---
-NUM_CASES = 8    # 스냅샷(케이스) 개수
+NUM_CASES = 19    # 스냅샷(케이스) 개수
 NX, NY = 101, 101  # 격자 크기
 N_NODES = NX * NY
-K = 8  # 사용할 모드의 개수 (최대 NUM_CASES)
-DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'offlineDATA')
+K = 19  # 사용할 모드의 개수 (최대 NUM_CASES)
+DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'DATA')
 
 # --- 유틸리티 함수 ---
 

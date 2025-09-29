@@ -171,7 +171,7 @@ def run_online_stage(re_input, output_dir=None):
         if hasattr(residual_with_monitor, "iteration"):
             del residual_with_monitor.iteration
 
-        alpha_solution, info, ier, msg = fsolve(residual_with_monitor, alpha_initial_guess, args=args, full_output=True, xtol=1e-9)
+        alpha_solution, info, ier, msg = fsolve(residual_with_monitor, alpha_initial_guess, args=args, full_output=True, xtol=1e-14)
         
         print("-----------------------------")
 

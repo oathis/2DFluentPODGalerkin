@@ -7,11 +7,11 @@ import time
 import re # 숫자 추출을 위해 re 모듈 추가
 
 # --- 설정값 ---
-NUM_CASES = 19    # 스냅샷(케이스) 개수
+NUM_CASES = 8    # 스냅샷(케이스) 개수
 NX, NY = 101, 101  # 격자 크기
 N_NODES = NX * NY
-K = 8   # 사용할 모드의 개수 (최대 NUM_CASES)
-DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'DATA')
+K = 8  # 사용할 모드의 개수 (최대 NUM_CASES)
+DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'offlineDATA')
 
 # --- 유틸리티 함수 ---
 
@@ -242,7 +242,7 @@ def run_offline_stage(data_directory=None):
     # --- ✨여기에 코드를 추가하세요✨ ---
     print("2a. [Debug] Visualizing the first interior snapshot...")
     # 첫 번째 스냅샷(case 1)의 내부 유동장을 이미지로 저장
-    case_to_visualize = 0 
+    case_to_visualize = 0
     visualize_interior_snapshot(Q_interior[:, case_to_visualize], NX, NY, case_to_visualize, data_directory)
     # ---------------------------------
 

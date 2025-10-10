@@ -17,9 +17,9 @@ This repository provides a pipeline that builds a Proper Orthogonal Decompositio
 1. **Data sorting**  
    Place Fluent `case*.csv` files in a working folder such as `offlineDATA/` and run `python PreProcessing/preprocessing.py` to generate the `_sorted` files.
 2. **Offline stage**  
-   Run `python Galerkin_offline.py` to read `offlineDATA/case*_sorted.csv`, compute POD modes and Galerkin tensors, and store the results in `rom_offline_data.npz`.
+   Run `Galerkin_offline_pressureFullmode_normed.py` to read `offlineDATA/case*_sorted.csv`, compute POD modes and Galerkin tensors, and store the results in `rom_offline_data.npz`.
 3. **Online stage**  
-   Run `python Galerkin_online.py`, enter the desired Reynolds number, and the reduced model will reconstruct the flow field, saving the output to `FinalResult/rom_solution_Re_<Re>.csv` along with PNG plots.
+   Run `Galerkin_online_normed.py`, enter the desired Reynolds number, and the reduced model will reconstruct the flow field, saving the output to `FinalResult/rom_solution_Re_<Re>.csv` along with PNG plots.
 4. **(Optional) Post-processing**  
    Run `python PostProcessing/CalculateL2.py` to compare the reference and ROM solutions and generate the Reynolds-number-dependent relative L2 error plot.
 

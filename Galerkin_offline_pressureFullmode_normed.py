@@ -255,6 +255,15 @@ def run_offline_stage(data_directory=None):
     Phi_interior = U[:, :K]
 
 
+    # 계수 통계량을 계산하여 온라인 단계에서 변수 스케일링에 활용
+    coeff_samples = Phi_interior.T @ Q_interior  # shape: (K, num_cases)
+    coeff_mean = coeff_samples.mean(axis=1)
+    coeff_std = coeff_samples.std(axis=1)
+    print("3b. Mean/Std of projected coefficients")
+    for idx, (mean_val, std_val) in enumerate(zip(coeff_mean, coeff_std), start=1):
+        print(f"   Mode {idx:2d}: mean = {mean_val:+.3e}, std = {std_val:.3e}")
+
+
 
     print("\n3a. [Verification] Analyzing energy distribution within each mode...")
 
@@ -360,7 +369,8 @@ def run_offline_stage(data_directory=None):
     np.savez('rom_offline_data.npz',
              p_modes=p_modes_full, u_modes=u_modes, v_modes=v_modes,
              u_bc=u_bc, coords=coords,
-             C1=C1, C2=C2, L1=L1, L2=L2, Q=Q, K=K, NX=NX, NY=NY
+             C1=C1, C2=C2, L1=L1, L2=L2, Q=Q, K=K, NX=NX, NY=NY,
+             alpha_mean=coeff_mean, alpha_std=coeff_std             
             )
     
     end_time = time.time()

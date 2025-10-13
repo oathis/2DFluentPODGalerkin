@@ -86,9 +86,21 @@ def residual_with_monitor(alpha_scaled, Re, C1, C2, L1, L2, Q, alpha_mean, alpha
 def reconstruct_solution(alpha, modes_data):
     """계산된 계수 alpha를 사용하여 전체 유동장을 재구성합니다."""
     print("\nReconstructing full field solution...")
-    p = modes_data['p_modes'] @ alpha
-    u = modes_data['u_bc'] + (modes_data['u_modes'] @ alpha)
-    v = modes_data['v_modes'] @ alpha
+
+    p_mean = modes_data.get('p_mean')
+    u_mean = modes_data.get('u_mean')
+    v_mean = modes_data.get('v_mean')
+
+    if p_mean is None:
+        p_mean = np.zeros_like(modes_data['p_modes'][:, 0])
+    if u_mean is None:
+        u_mean = np.zeros_like(modes_data['u_modes'][:, 0])
+    if v_mean is None:
+        v_mean = np.zeros_like(modes_data['v_modes'][:, 0])
+
+    p = p_mean + (modes_data['p_modes'] @ alpha)
+    u = modes_data['u_bc'] + u_mean + (modes_data['u_modes'] @ alpha)
+    v = v_mean + (modes_data['v_modes'] @ alpha)
     return p, u, v
 
 # --- ✨ 2. 함수가 저장 경로를 인자로 받도록 수정 ---

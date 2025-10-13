@@ -210,7 +210,7 @@ def run_online_stage(re_input, output_dir=None):
             alpha_initial_guess,
             args=args,
             full_output=True,
-            xtol=1e-14
+            xtol=1e-12
         )
         
         

@@ -240,6 +240,6 @@ if __name__ == "__main__":
     rom_stability_diagnostics(
         npz_path="rom_offline_data.npz",
         outdir="Diagnostics",
-        n_show_pressure_modes=8,
-        n_show_velocity_modes=8
+        n_show_pressure_modes=19,
+        n_show_velocity_modes=19
     )

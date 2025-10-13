@@ -86,9 +86,21 @@ def residual_with_monitor(alpha_scaled, Re, C1, C2, L1, L2, Q, alpha_mean, alpha
 def reconstruct_solution(alpha, modes_data):
     """계산된 계수 alpha를 사용하여 전체 유동장을 재구성합니다."""
     print("\nReconstructing full field solution...")
-    p = modes_data['p_modes'] @ alpha
-    u = modes_data['u_bc'] + (modes_data['u_modes'] @ alpha)
-    v = modes_data['v_modes'] @ alpha
+
+    p_mean = modes_data.get('p_mean')
+    u_mean = modes_data.get('u_mean')
+    v_mean = modes_data.get('v_mean')
+
+    if p_mean is None:
+        p_mean = np.zeros_like(modes_data['p_modes'][:, 0])
+    if u_mean is None:
+        u_mean = np.zeros_like(modes_data['u_modes'][:, 0])
+    if v_mean is None:
+        v_mean = np.zeros_like(modes_data['v_modes'][:, 0])
+
+    p = p_mean + (modes_data['p_modes'] @ alpha)
+    u = modes_data['u_bc'] + u_mean + (modes_data['u_modes'] @ alpha)
+    v = v_mean + (modes_data['v_modes'] @ alpha)
     return p, u, v
 
 # --- ✨ 2. 함수가 저장 경로를 인자로 받도록 수정 ---
@@ -210,7 +222,7 @@ def run_online_stage(re_input, output_dir=None):
             alpha_initial_guess,
             args=args,
             full_output=True,
-            xtol=1e-12
+            xtol=1e-13
         )
         
         
@@ -244,7 +256,7 @@ if __name__ == '__main__':
     default_output_dir = os.environ.get('ONLINE_OUTPUT_DIRECTORY', DEFAULT_OUTPUT_DIRECTORY)
     # 100부터 1000까지 25씩 증가하는 Reynolds 수 리스트 생성
     # np.arange(start, stop, step)은 stop 값을 포함하지 않으므로 1001로 설정
-    re_list = np.arange(100, 1001, 50)
+    re_list = np.arange(100, 1001, 25)
 
     print(f"Starting online stage for {len(re_list)} Reynolds numbers...")
     print(re_list) # 생성된 리스트 확인 (선택 사항)

@@ -249,14 +249,30 @@ def run_offline_stage(data_directory=None):
     # ---------------------------------
 
 
-    # 3. POD 수행
-    print(f"3. Performing POD for k={K} modes...")
-    U, s, Vh = svd(Q_interior, full_matrices=False)
+    # 3. 평균장 분리 및 POD 수행
+    print("3. Computing mean fields and performing POD on fluctuations...")
+    mean_interior = Q_interior.mean(axis=1)
+
+    p_mean_full = mean_interior[0:N_NODES]
+    u_mean_int = mean_interior[N_NODES:N_NODES + n_nodes_int]
+    v_mean_int = mean_interior[N_NODES + n_nodes_int:N_NODES + 2 * n_nodes_int]
+
+    def expand_interior_field(field_int):
+        """내부 격자에 정의된 필드를 전체 격자로 확장합니다."""
+        expanded = expand_modes(field_int.reshape(-1, 1), NX, NY)
+        return expanded[:, 0]
+
+    u_mean_full = expand_interior_field(u_mean_int)
+    v_mean_full = expand_interior_field(v_mean_int)
+
+    Q_fluct = Q_interior - mean_interior[:, None]
+
+    U, s, Vh = svd(Q_fluct, full_matrices=False)
     Phi_interior = U[:, :K]
 
 
     # 계수 통계량을 계산하여 온라인 단계에서 변수 스케일링에 활용
-    coeff_samples = Phi_interior.T @ Q_interior  # shape: (K, num_cases)
+    coeff_samples = Phi_interior.T @ Q_fluct  # shape: (K, num_cases)
     coeff_mean = coeff_samples.mean(axis=1)
     coeff_std = coeff_samples.std(axis=1)
     print("3b. Mean/Std of projected coefficients")
@@ -368,6 +384,7 @@ def run_offline_stage(data_directory=None):
     print("7. Saving offline data to 'rom_offline_data.npz'...")
     np.savez('rom_offline_data.npz',
              p_modes=p_modes_full, u_modes=u_modes, v_modes=v_modes,
+             p_mean=p_mean_full, u_mean=u_mean_full, v_mean=v_mean_full,
              u_bc=u_bc, coords=coords,
              C1=C1, C2=C2, L1=L1, L2=L2, Q=Q, K=K, NX=NX, NY=NY,
              alpha_mean=coeff_mean, alpha_std=coeff_std             

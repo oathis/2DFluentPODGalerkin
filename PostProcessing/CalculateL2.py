@@ -16,10 +16,10 @@ def analyze_rom_error():
     원본 솔루션과 ROM 솔루션의 오차를 분석하고 시각화합니다.
     """
     # --- 설정 ---
-    original_data_path = r'C:\Users\spearlab05\Desktop\Galerkin ROM\Data'
+    original_data_path = r'C:\Users\spearlab05\Desktop\Galerkin ROM\TestData'
     rom_data_path = r'C:\Users\spearlab05\Desktop\Galerkin ROM\FinalResult'
     #rom_data_path = r'C:\Users\spearlab05\Desktop\Galerkin ROM\RESULT STORAGE\Re_8_k_8\FinalResult'
-    reynolds_numbers = [i for i in range(100, 1001, 50)]
+    reynolds_numbers = [i for i in range(100, 1001, 10)]
     variables_to_compare = ['pressure', 'x-velocity', 'y-velocity']
     errors = {var: [] for var in variables_to_compare}
 

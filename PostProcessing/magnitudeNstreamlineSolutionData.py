@@ -83,10 +83,12 @@ def plot_velocity_and_streamlines(file_path, output_dir):
 # --- 메인 실행 부분 ---
 
 # 1. CSV 파일이 있는 기본 디렉토리 경로를 설정해주세요.
-base_directory = r'C:\Users\spearlab05\Desktop\Galerkin ROM\Data'
-
+#base_directory = r'C:\Users\spearlab05\Desktop\Galerkin ROM\Data'
+base_directory = r'C:\Users\spearlab05\Desktop\100to1000Re\sorted'
 # 2. 생성된 PNG 이미지를 저장할 디렉토리 경로를 설정해주세요.
-output_directory = r'C:\Users\spearlab05\Desktop\Galerkin ROM\StreamlineOfSOLUTIONDATA'
+#output_directory = r'C:\Users\spearlab05\Desktop\Galerkin ROM\StreamlineOfSOLUTIONDATA'
+output_directory = r'C:\Users\spearlab05\Desktop\100to1000Re\sorted\png'
+
 
 # 3. 저장할 디렉토리가 없으면 새로 생성합니다.
 if not os.path.exists(output_directory):

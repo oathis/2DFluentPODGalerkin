@@ -6,8 +6,8 @@ import re
 # --- ✨ 설정 ✨ ---
 
 # 1. PNG 이미지 파일들이 있는 폴더 경로를 지정하세요.
-IMAGE_FOLDER = r'C:\Users\spearlab05\Desktop\Galerkin ROM\FinalResult_Streamline' # 예시 경로입니다. 실제 폴더 경로로 변경해주세요.
-
+#IMAGE_FOLDER = r'C:\Users\spearlab05\Desktop\Galerkin ROM\FinalResult_Streamline' # 예시 경로입니다. 실제 폴더 경로로 변경해주세요.
+IMAGE_FOLDER = r'C:\Users\spearlab05\Desktop\100to1000Re\sorted\png'
 # 2. 동영상을 만들 이미지 파일명의 시작 부분을 지정하세요.
 #    사용자님의 파일 이름이 'flow_visualization_Re_620.png' 이므로, 'flow_visualization'으로 설정합니다.
 FILE_PREFIX = 'flow_visualization'

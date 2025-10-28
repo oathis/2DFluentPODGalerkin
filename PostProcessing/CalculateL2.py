@@ -63,8 +63,13 @@ def analyze_rom_error():
 
             if merged_df.empty:
                 print("Warning: No matching internal nodes found between the two files.")
+                # (선택) 각 변수의 평균 오차 수평선 표시
                 for var in variables_to_compare:
-                    errors[var].append(np.nan)
+                    if errors[var]:
+                        mean_error = np.nanmean(errors[var])
+                        plt.hlines(mean_error, xmin=reynolds_numbers[0], xmax=reynolds_numbers[-1],
+                                linestyles='dashed', linewidth=1.0, label=f'{var} mean')
+
                 continue
 
             # (이하 오차 계산 및 시각화 코드는 동일)
@@ -86,7 +91,8 @@ def analyze_rom_error():
         # np.nanmax를 사용하여 NaN 값을 무시하고 최대값을 찾습니다.
         if errors[var]: # 리스트가 비어있지 않은지 확인
             max_error = np.nanmax(errors[var])
-            print(f"Maximum L2 Relative Error for '{var}': {max_error}")
+            mean_error = np.nanmean(errors[var])  # ⭐ 평균 L2 상대 오차
+            print(f"[{var}] Max L2 Rel. Error: {max_error:.6e} | Mean L2 Rel. Error: {mean_error:.6e}")
         else:
             print(f"No valid errors calculated for '{var}'.")
     # ----------------------------------------------------

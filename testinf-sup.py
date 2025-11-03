@@ -141,7 +141,7 @@ def plot_velocity_modes(u_modes, v_modes, nx, ny, outdir, first_k=6, quiver_stri
 # ---------------------------
 # 5) B 행렬(SVD) & 발산 노름 진단 + 모드 성분 에너지/결합 세기
 # ---------------------------
-def rom_stability_diagnostics(npz_path='rom_offline_data.npz',
+def rom_stability_diagnostics(npz_path='ppe_rom_offline_data.npz',
                               outdir='Diagnostics',
                               n_show_pressure_modes=6,
                               n_show_velocity_modes=6):
@@ -238,8 +238,8 @@ def rom_stability_diagnostics(npz_path='rom_offline_data.npz',
 # ---------------------------
 if __name__ == "__main__":
     rom_stability_diagnostics(
-        npz_path="rom_offline_data.npz",
+        npz_path="ppe_rom_offline_data.npz",
         outdir="Diagnostics",
-        n_show_pressure_modes=19,
-        n_show_velocity_modes=19
+        n_show_pressure_modes=1,
+        n_show_velocity_modes=36
     )

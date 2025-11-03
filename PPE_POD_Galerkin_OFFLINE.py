@@ -8,10 +8,10 @@ from scipy.linalg import svd
 
 # --- Config ---
 NUM_CASES = 36
-NX, NY = 101, 101
+NX, NY = 201, 201
 N_NODES = NX * NY
 K_VEL = 36
-K_PRS = 36
+K_PRS = 5
 DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "TrainData")
 OUTPUT_FILENAME = "ppe_rom_offline_data.npz"
 
@@ -327,10 +327,7 @@ def main(data_directory: str = DEFAULT_DATA_DIRECTORY):
     print(f"Truncation: Ku={Ku}, Kp={Kp}")
 
     # Operators
-    deriv = DerivativeHelper(NX, NY)
-    debug_offline_diagnostics(chi, phi_u, phi_v, 
-                              ops={'B':np.zeros((1,1)),'D':np.zeros((1,1))},  # 더미(곧 교체)
-                              deriv=deriv, Qp_fluc=Qp_fluc)  # ops 아직 없으므로 B/D는 나중에    
+    deriv = DerivativeHelper(NX, NY)   
     ops = assemble_operators_lifting(phi_u, phi_v, chi, u_bc, v_bc,p_bar, deriv)
     debug_offline_diagnostics(chi, phi_u, phi_v, ops, deriv, Qp_fluc=None)
     # Scales for block-balancing (optional)

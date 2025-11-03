@@ -332,12 +332,14 @@ def run_online_stage(re_values: Sequence[float] | float, output_dir: str|None=No
         print(f"\nSolving steady PPE-ROM (split, lifting) for Re={Re} ...")
         
         if solver == 'fsolve':
+            #Z0=z_prev면 warm start, z0=None이면 cold start
             a,b = solve_steady_rom(Re, off, z0=z_prev, tol=tol, use_boundary_term=use_boundary_term)
         elif solver == 'ls':
+            #Z0=z_prev면 warm start, z0=None이면 cold start
             a,b = solve_steady_rom_ls(
             Re, off, z0=z_prev, tol=tol, use_boundary_term=use_boundary_term,
-            loss='linear',       # 필요시 'soft_l1'로 바꿔보면 수렴 더 잘 됨
-            f_scale=1.0,         # soft_l1/huber 쓸 때만 의미 있음
+            loss='linear',       # 'soft_l1'로 바꿔봐도됨ㅅ
+            f_scale=1.0,         # soft_l1/huber 쓸 때만 필요변수임
             max_nfev=20000,
             verbose=2,
             )
@@ -351,6 +353,6 @@ def run_online_stage(re_values: Sequence[float] | float, output_dir: str|None=No
 
 if __name__=="__main__":
 
-    re_list = np.arange(100, 1001, 100)
+    re_list = np.arange(100, 1001, 10)
     re_list_test = [100,200,600,800,1000]
-    run_online_stage(re_list,solver='fsolve')
+    run_online_stage(re_list_test,solver='fsolve')

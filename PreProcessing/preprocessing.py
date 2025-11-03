@@ -2,7 +2,7 @@ import pandas as pd
 import glob
 import os
 
-def batch_sort_grid_data(folder_path=r"C:\Users\spearlab05\Desktop\Galerkin ROM\Data"):
+def batch_sort_grid_data(folder_path=r"C:\Users\spearlab05\Desktop\Testy데이터저장소\FOM_origin_Data\40000cell\RawData"):
     """
     지정된 폴더에서 'case*.csv' 파일을 모두 찾아
     각각을 행 우선 순서(y-x)로 정렬하고,

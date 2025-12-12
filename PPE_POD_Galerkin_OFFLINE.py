@@ -1,4 +1,6 @@
 # offline.py — Steady PPE-ROM (Lifting + POD + Galerkin, with constant/linear/quadratic split)
+# @Kim Jae Sik
+
 
 import glob, os, re, time
 from typing import List, Tuple
@@ -10,8 +12,8 @@ from scipy.linalg import svd
 NUM_CASES = 36
 NX, NY = 201, 201
 N_NODES = NX * NY
-K_VEL = 36
-K_PRS = 5
+K_VEL =  18
+K_PRS = 3
 DEFAULT_DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "TrainData")
 OUTPUT_FILENAME = "ppe_rom_offline_data.npz"
 
@@ -308,16 +310,6 @@ def main(data_directory: str = DEFAULT_DATA_DIRECTORY):
     # 1) 압력 POD 모드
     chi = Up[:, :Kp]
 
-    # 2) 상수 모드 성분 제거 (projection)
-    one = np.ones(N_NODES, dtype=float)
-    one /= np.linalg.norm(one)                 # ||one||_2 = 1
-    chi -= np.outer(one, one @ chi)            # chi = chi - one * (one^T chi)
-
-    # 3) 재직교화 (권장)
-    chi, _ = np.linalg.qr(chi)
-
-    # (선택) 확인용 진단 출력
-    print(f"[chi] overlap with constant after projection: {np.linalg.norm(one @ chi):.3e}")
 
     # 4) 속도 POD 모드 분리
     phi_uv = Uu[:, :Ku]

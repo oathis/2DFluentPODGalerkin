@@ -1,4 +1,5 @@
-# README Draft
+# README
+@Kim Jae Sik
 
 ## Overview
 This repository provides a pipeline that builds a Proper Orthogonal Decomposition (POD) Galerkin reduced-order model from 2D flow snapshots exported from Ansys Fluent. Given a target Reynolds number, the reduced model is solved to reconstruct the full flow field.
